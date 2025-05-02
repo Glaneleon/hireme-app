@@ -101,7 +101,7 @@ if (isset($_SESSION['username'])) {
     if ($companydetails !== null && $companyprofile == null) { ?>
 
       <li class="menu-item">
-        <a href="./email-verification.php" class="menu-link">
+        <a href="./registration.php" class="menu-link">
           <i class="menu-icon tf-icons bx bx-file"></i>
           <div data-i18n="Continue Registration">Continue Registration</div>
         </a>

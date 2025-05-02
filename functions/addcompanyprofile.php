@@ -1,28 +1,38 @@
 <?php
 require_once('../classes/company.php');
 
-$company = new Company($conn);
+header('Content-Type: application/json');
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $name = $_POST['name'];
-    $address = $_POST['address'];
-    $contactNumber = $_POST['contact_number'];
-    $email = $_POST['email'];
-    $repPosition = $_POST['rep_position'];
-    $repName = $_POST['rep_name'];
-    $repNumber = $_POST['rep_number'];
-    $companyID = $_POST['companyID'];
-
-    $success = $company->addCompanyProfile($name, $address, $contactNumber, $email, $repPosition, $repName, $repNumber, $companyID);
-
-    if ($success) {
-        $response = array('status' => 'success', 'message' => 'Company profile added successfully.', 'redirect' => '../company/dashboard.php');
-    } else {
-        $response = array('status' => 'error', 'message' => 'Failed to add company profile.');
-    }
-} else {
-    $response = array('status' => 'error', 'message' => 'Invalid request method.');
+function respond($status, $message, $redirect = null, $code = 200) {
+    http_response_code($code);
+    echo json_encode([
+        'status' => $status,
+        'message' => $message,
+        'redirect' => $redirect
+    ]);
+    exit();
 }
 
-echo json_encode($response);
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    $company = new Company($conn);
+
+    $success = $company->addCompanyProfile(
+        $_POST['name'],
+        $_POST['address'],
+        $_POST['contact_number'],
+        $_POST['email'],
+        $_POST['rep_position'],
+        $_POST['rep_name'],
+        $_POST['rep_number'],
+        $_POST['companyID']
+    );
+
+    if ($success === true) {
+        respond('success', 'Company profile added successfully.', '../company/dashboard.php');
+    } else {
+        respond('error', $success);
+    }
+}
+
+respond('error', 'Invalid request method.', null, 400);
 ?>

@@ -256,20 +256,50 @@ class Company
 
     public function addCompanyProfile($name, $address, $contactNumber, $email, $repPosition, $repName, $repNumber, $companyId)
     {
-        $stmt1 = $this->conn->prepare("INSERT INTO companyprofile (name, address, contact_number, email, rep_position, rep_name, rep_number, companyID) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt1->bind_param("ssssssss", $name, $address, $contactNumber, $email, $repPosition, $repName, $repNumber, $companyId);
+        $count = 0;
 
-        $stmt2 = $this->conn->prepare("INSERT INTO companydocuments (CompanyID, sec, businesspermit, bir, mayorpermit, certificate) VALUES (?, 0, 0, 0, 0, 0)");
-        $stmt2->bind_param("s", $companyId);
-
-        $success = $stmt1->execute() && $stmt2->execute();
-
-        if ($success) {
+        $checkStmt = $this->conn->prepare("SELECT COUNT(*) FROM companyprofile WHERE name = ? OR email = ?");
+        $checkStmt->bind_param("ss", $name, $email);
+        $checkStmt->execute();
+        $checkStmt->bind_result($count);
+        $checkStmt->fetch();
+        $checkStmt->close();
+    
+        if ($count > 0) {
+            return "Duplicate entry for name or email";
+        }
+    
+        $this->conn->begin_transaction();
+    
+        try {
+            $docCount = 0;
+            $stmt1 = $this->conn->prepare("INSERT INTO companyprofile (name, address, contact_number, email, rep_position, rep_name, rep_number, companyID) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt1->bind_param("sssssssi", $name, $address, $contactNumber, $email, $repPosition, $repName, $repNumber, $companyId);
+            $stmt1->execute();
+            $stmt1->close();
+        
+            $checkDoc = $this->conn->prepare("SELECT COUNT(*) FROM companydocuments WHERE CompanyID = ?");
+            $checkDoc->bind_param("i", $companyId);
+            $checkDoc->execute();
+            $checkDoc->bind_result($docCount);
+            $checkDoc->fetch();
+            $checkDoc->close();
+        
+            if ($docCount == 0) {
+                $stmt2 = $this->conn->prepare("INSERT INTO companydocuments (CompanyID, sec, businesspermit, bir, mayorpermit, certificate) VALUES (?, 0, 0, 0, 0, 0)");
+                $stmt2->bind_param("i", $companyId);
+                $stmt2->execute();
+                $stmt2->close();
+            }
+        
+            $this->conn->commit();
             return true;
-        } else {
-            return false;
+        } catch (mysqli_sql_exception $e) {
+            $this->conn->rollback();
+            return "Error: " . $e->getMessage();
         }
     }
+
 
     public function getCompanyProfile($companyId) {
         $stmt = $this->conn->prepare("SELECT * FROM companyprofile WHERE companyID = ?");

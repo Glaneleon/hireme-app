@@ -17,6 +17,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 require_once '../classes/jobseeker.php';
 require_once '../classes/job.php';
+require_once '../classes/user.php';
 require_once '../classes/jobseekerapplication.php';
 require_once '../classes/interview.php';
 require_once '../classes/pdf.php';
@@ -26,10 +27,12 @@ $interview = new Interview($conn);
 $jobseeker = new JobSeeker($conn);
 $jobseekerapplication = new JobSeekerApplication($conn);
 $job = new Job($conn);
+$user = new User($conn);
 
 $jobName = $job->getJobDetailsByID($jobID)->getJobTitle();
 $applicationdetails = $jobseekerapplication->getJobApplicationDetailsByUserID($applicantID, $jobID);
 $applicantdetails = $jobseeker->getJobSeekerDetailsByUserID($applicantID);
+$email = $user->getUserDetailsByUserID($applicantID)->getEmail();
 
 $pagetitle = "HireMe - View Applicant # " . $applicantID;
 ?>
@@ -47,6 +50,7 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
 <!-- /Head -->
 
 <body>
+  <input type="text" name="email" id="email" value="<?= $email; ?>" hidden>
   <!-- Toast Overlay -->
   <div id="toast-container"></div>
   <div class="overlay"></div>
@@ -101,14 +105,14 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
                             $link = modify_google_drive_link($resumeId);
                               // Check if the link is a Google Drive link
                             if (is_google_drive_link($resumeId)) {
-                                echo '<iframe src="' . $link . '" width="100%" height="600px"></iframe>';
+                                echo '<iframe src="' . $link . '" width="100%" height="600px" alt="gdrive"></iframe>';
                             } else {
                                 echo "That was not a Google Drive link.";
                             }
                         } elseif ($resume) {
                             $base64_pdf = base64_encode($resume);
                             $pdf_data_uri = 'data:application/pdf;base64,' . $base64_pdf;
-                            echo '<iframe src="' . $pdf_data_uri . '" width="100%" height="600px"></iframe>';
+                            echo '<iframe src="' . $pdf_data_uri . '" width="100%" height="600px" alt="pdf"></iframe>';
                         } else {
                             echo "File not found.";
                         }
@@ -272,7 +276,7 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                  <form id="setInterview" method="post" action="../functions/addinterview.php">
+                  <form id="setInterview" method="post">
                     <input type="text" id="jobID" name="jobID" value="<?= $jobID; ?>" hidden required>
                     <input type="text" id="jobSeekerApplicationID" name="jobSeekerApplicationID" value="<?= $applicationID ?>" hidden required>
 
@@ -298,7 +302,7 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
                   <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                  <form id="changeapplicationstatus" method="post" action="../functions/changeapplicationstatus.php">
+                  <form id="changeapplicationstatus" method="post">
                     <input type="text" id="jobID" name="jobID" value="<?= $jobID; ?>" hidden>
                     <input type="text" id="jobName" name="jobName" value="<?= $jobName; ?>" hidden>
                     <input type="text" id="userID" name="userID" value="<?= $applicantID; ?>" hidden>
@@ -308,12 +312,6 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
                     <input type="text" id="applicationID" name="applicationID" value="<?= $applicationID ?>" hidden>
 
                     <div class="form-group mb-5">
-                      <label for="dateHired">Date Hired:</label>
-                      <p><span class="text-danger">*</span><small class="text-muted">Not required if choosing "Rejected".</small></p>
-                      <input type="datetime-local" class="form-control" id="dateHired" name="dateHired" required ="<?php echo date('Y-m-d\TH:i'); ?>" required> <!--removed max kasi na rerestrict-->
-                    </div>
-
-                    <div class="form-group mb-5">
                       <label for="status">Status:</label>
                       <select class="form-control" id="status" name="status" required>
                         <option selected disabled>-- Select an option --</option>
@@ -321,11 +319,13 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
                         <option value="Rejected">Reject Applicant</option>
                       </select>
                     </div>
+
                     <div class="form-group mb-5">
                       <label for="dateHired">Date Hired:</label>
-                      <!-- <p><span class="text-danger">*</span><small class="text-muted">Not required if choosing "Rejected".</small></p> -->
+                      <p><span class="text-danger">*</span><small class="text-muted">Not required if choosing "Rejected".</small></p>
                       <input type="datetime-local" class="form-control" id="dateHired" name="dateHired" required ="<?php echo date('Y-m-d\TH:i'); ?>" required> <!--removed max kasi na rerestrict-->
                     </div>
+                    
                     <div class="form-group mb-5" hidden>
                       <label for="reason">Reason for Rejection:</label>
                       <textarea class="form-control" id="reason" name="reason" rows="3" required></textarea>
@@ -371,213 +371,121 @@ $pagetitle = "HireMe - View Applicant # " . $applicantID;
 
   <script>
     $(document).ready(function() {
-        document.getElementById('status').addEventListener('change', function () {
-        const reasonField = document.getElementById('reason').parentElement;
-        const dateHired = document.getElementById('dateHired').parentElement;
-        if (this.value === 'Rejected') {
-          reasonField.hidden = false;
-          dateHired.hidden = true;
-          document.getElementById('reason').required = true;
-          document.getElementById('dateHired').required = false;
-        } else {
-          reasonField.hidden = true;
-          dateHired.hidden = false;
-          document.getElementById('reason').required = false;
-          document.getElementById('dateHired').required = true;
+        const email = $('#email').val();
+        const userId = <?= $applicantID ?>;
+        const jobId = <?= $jobID ?>;
+    
+        function showToast(message, type) {
+            const toast = $('<div>', { class: 'toast ' + type, text: message });
+            $('#toast-container').append(toast);
+            toast.addClass('show');
+            setTimeout(() => {
+                toast.remove();
+                $('.overlay').hide();
+            }, 2000);
         }
-      });
-      var setInterviewButton = document.getElementById("setInterviewButton");
-
-      setInterviewButton.addEventListener("click", function(event) {
-        var modal = new bootstrap.Modal(document.getElementById("setInterviewModal"));
-        modal.show();
-      })
-
-      $('#setInterview').on('submit', function(e) {
-        e.preventDefault();
-
-        var formData = $(this).serialize();
-
-        $.ajax({
-          type: 'POST',
-          url: '../functions/addinterview.php',
-          data: formData,
-          dataType: 'json',
-          success: function(response) {
-            if (response.status === 'success') {
-              $('.overlay').show();
-              showToast(response.message, 'success');
-              setTimeout(function() {
-                location.reload();
-              }, 1400);
-            } else if (response.status === 'error') {
-              showToast(response.message, 'warning');
-            } else {
-              console.error('Unknown response status:', response.status);
-            }
-          },
-          error: function(xhr, status, error) {
-            console.error('AJAX Error:', error);
-            showToast('An error occurred. Please try again.', 'error');
-          }
-        });
-      });
-    });
-  </script>
-
-  <script>
-    $(document).ready(function() {
-      var changeStatusButton = document.getElementById("changeStatusButton");
-
-      changeStatusButton.addEventListener("click", function(event) {
-        var modal = new bootstrap.Modal(document.getElementById("changeStatusModal"));
-        modal.show();
-      })
-
-      $('#status').change(function() {
-        if ($(this).val() === 'Rejected') {
-          $('#dateHired').prop('required', false);
-        } else {
-          $('#dateHired').prop('required', true);
-        }
-      });
-
-      $('#changeapplicationstatus').submit(function(e) {
-        e.preventDefault();
-
-        var formData = $(this).serialize();
-
-        $.ajax({
-          type: 'POST',
-          url: '../functions/changestatus.php',
-          data: formData,
-          dataType: 'json',
-          success: function(response) {
-            if (response.status === 'success') {
-              $('.overlay').show();
-              showToast(response.message, 'success');
-              setTimeout(function() {
-                location.reload();
-              }, 1400);
-            } else if (response.status === 'error') {
-              showToast(response.message, 'warning');
-            } else {
-              console.error('Unknown response status:', response.status);
-            }
-          },
-          error: function(xhr, status, error) {
-            console.error('AJAX Error:', error);
-            showToast('An error occurred. Please try again.', 'error');
-          }
-        });
-      });
-    });
-  </script>
-
-  <script>
-    function handleFormSubmission(formData) {
-      $.ajax({
-        type: 'POST',
-        url: '../functions/updateapplicationstatus.php',
-        data: formData,
-        dataType: 'json',
-        success: function(response) {
-          if (response.status === 'success') {
-            $('.overlay').show();
-            showToast(response.message, 'success');
-            setTimeout(function() {
-              window.location.href = response.redirect;
-            }, 1400);
-          } else if (response.status === 'error') {
-            showToast(response.message, 'warning');
-          } else {
-            console.error('Unknown response status:', response.status);
-          }
-        },
-        error: function(xhr, status, error) {
-          console.error('AJAX Error:', error);
-          showToast('An error occurred. Please try again.', 'error');
-        }
-      });
-    }
-
-    function showToast(message, type) {
-      var toast = $('<div>', {
-        class: 'toast ' + type,
-        text: message
-      });
-      $('#toast-container').append(toast);
-      toast.addClass('show');
-      setTimeout(function() {
-        toast.remove();
-        $('.overlay').hide();
-      }, 2000);
-    }
-
-    function getPDF(userId, jobId) {
-      fetch(`../functions/getpdf.php?userId=${userId}&jobId=${jobId}`)
-        .then(response => response.blob())
-        .then(blob => {
-          const url = URL.createObjectURL(blob);
-          const pdfViewer = document.getElementById('pdfViewer');
-          pdfViewer.src = url;
-        })
-        .catch(error => {
-          console.error('Error fetching PDF:', error);
-        });
-    }
-
-    document.addEventListener("DOMContentLoaded", function() {
-      const userId = <?= $applicantID ?>;
-      const jobId = <?= $jobID ?>;
-      // getPDF(userId, jobId);
-
-      var confirmationModal = document.getElementById("confirmationModal");
-      var verifyButton = document.querySelector("#updateapplication button[value='Verified']");
-      var rejectButton = document.querySelector("#updateapplication button[value='Rejected']");
-      var statusValue = "";
-
-      verifyButton.addEventListener("click", function(event) {
-        event.preventDefault();
-        statusValue = "Verified";
-        let reason = "";
-        var modalMessage = confirmationModal.querySelector(".modal-body");
-        modalMessage.innerHTML = "You clicked <strong class='text-success'>VERIFY</strong>. Are you sure you want to continue? <strong>This action cannot be undone.</strong>";
-        var modal = new bootstrap.Modal(confirmationModal);
-        modal.show();
-      });
-
-      rejectButton.addEventListener("click", function(event) {
-        event.preventDefault();
-        statusValue = "Rejected";
-        var modalMessage = confirmationModal.querySelector(".modal-body");
-        modalMessage.innerHTML = "You clicked <strong class='text-danger'>REJECT</strong>. Are you sure you want to continue? <strong>This action cannot be undone.</strong>";
-        modalMessage.innerHTML += '<textarea class="form-control" id="reason" name="reason" rows="3" placeholder="Reason for Rejection"></textarea>';
-        var modal = new bootstrap.Modal(confirmationModal);
-        modal.show();
-      }); 
-         
-      document.getElementById("confirmationModal").querySelector(".btn-primary").addEventListener("click", function () {
-              var reason = "";
-              if(statusValue === "Rejected"){
-                let reasonField = document.getElementById('reason');
-                let reason = reasonField.value.trim();
-                
-                if (reason === "" && statusValue === "Rejected") {
-                  alert("Please provide a reason for rejection.");
-                  reasonField.focus();
-                  return;
+      
+        function handleFormSubmission(formData, url, redirect = false) {
+            formData.append('email', email);
+            $.ajax({
+                type: 'POST',
+                url: url,
+                data: formData,
+                dataType: 'json',
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.status === 'success') {
+                        $('.overlay').show();
+                        showToast(response.message, 'success');
+                        setTimeout(() => {
+                            if (redirect) {
+                                window.location.href = response.redirect;
+                            } else {
+                                location.reload();
+                            }
+                        }, 1400);
+                    } else {
+                        showToast(response.message, 'warning');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    showToast('An error occurred. Please try again.', 'error');
                 }
-              }
-            
-              var formData = $('#updateapplication').serialize();
-              formData += "&status=" + statusValue;
-              formData += "&reason=" + reason;
-            
-              handleFormSubmission(formData);
-          });
+            });
+        }
+      
+        $('#status').on('change', function() {
+            const isRejected = $(this).val() === 'Rejected';
+            $('#reason').parent().prop('hidden', !isRejected);
+            $('#dateHired').parent().prop('hidden', isRejected);
+            $('#reason').prop('required', isRejected);
+            $('#dateHired').prop('required', !isRejected);
+        });
+      
+        $('#setInterviewButton, #changeStatusButton').on('click', function() {
+            const targetModal = $(this).data('target') || $(this).attr('data-bs-target');
+            const modal = new bootstrap.Modal(document.querySelector(targetModal));
+            modal.show();
+        });
+      
+        $('#setInterview').on('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            ['jobID', 'jobName', 'userID', 'fullName', 'companyID', 'companyName', 'applicationID'].forEach(id => {
+                formData.append(id, $(`#${id}`).val());
+            });
+            handleFormSubmission(formData, '../functions/addinterview.php');
+        });
+      
+        $('#changeapplicationstatus').on('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            handleFormSubmission(formData, '../functions/changestatus.php');
+        });
+      
+        const confirmationModal = new bootstrap.Modal(document.getElementById("confirmationModal"));
+        let statusValue = '';
+      
+        $('#updateapplication button').on('click', function(e) {
+            e.preventDefault();
+            statusValue = $(this).val();
+            const modalBody = $('#confirmationModal .modal-body');
+        
+            if (statusValue === 'Rejected') {
+                modalBody.html("You clicked <strong class='text-danger'>REJECT</strong>. Are you sure? <strong>This action cannot be undone.</strong><textarea class='form-control' id='reasonInput' name='reason' rows='3' placeholder='Reason for Rejection'></textarea>");
+            } else {
+                modalBody.html("You clicked <strong class='text-success'>VERIFY</strong>. Are you sure? <strong>This action cannot be undone.</strong>");
+            }
+          
+            confirmationModal.show();
+        });
+      
+        $('#confirmationModal .btn-primary').on('click', function () {
+            const reason = statusValue === 'Rejected' ? $('#reasonInput').val().trim() : '';
+            if (statusValue === 'Rejected' && !reason) {
+                alert('Please provide a reason for rejection.');
+                $('#reasonInput').focus();
+                return;
+            }
+          
+            const form = $('#updateapplication')[0];
+            const formData = new FormData(form);
+            formData.append('status', statusValue);
+            formData.append('reason', reason);
+          
+            ['jobID', 'jobName', 'userID', 'fullName', 'companyID', 'companyName', 'applicationID'].forEach(id => {
+                formData.append(id, $(`#${id}`).val());
+            });
+          
+            handleFormSubmission(formData, '../functions/updateapplicationstatus.php', true);
+        });
+
     });
-  </script>
+</script>
+
+
 </body>
 
 </html>

@@ -5,9 +5,11 @@ if (!isset($_SESSION)) {
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/userdetails.php';
 
-require_once '../assets/vendor/libs/phpmailer/src/PHPMailer.php';
-require_once '../assets/vendor/libs/phpmailer/src/SMTP.php';
-require_once '../assets/vendor/libs/phpmailer/src/Exception.php';
+if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+    require_once '../hireme/PHPMailer/src/Exception.php';
+    require_once '../hireme/PHPMailer/src/PHPMailer.php';
+    require_once '../hireme/PHPMailer/src/SMTP.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -19,24 +21,62 @@ class User {
     public function __construct($conn) {
         $this->conn = $conn;
     }
-
-    public function addUser($username, $password, $email, $role, $token) {
+    
+    public function getAllUsernamesAndEmails() {
         try {
+            $stmt = $this->conn->prepare("SELECT Username, Email FROM users");
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $users = $result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            return $users;
+        } catch (Exception $e) {
+            return $e->getMessage();
+        }
+    }
+    
+    public function addUser($username, $password, $email, $role, $token) {
+        $emailCount = 0;
+        $usernameCount = 0;
+        try {
+            // Check if email already exists
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM users WHERE Email = ?");
+            $stmt->bind_param("s", $email);
+            $stmt->execute();
+            $stmt->bind_result($emailCount);
+            $stmt->fetch();
+            $stmt->close();
+    
+            if ($emailCount > 0) {
+                return "Email is already registered.";
+            }
+    
+            // Check if username already exists
+            $stmt = $this->conn->prepare("SELECT COUNT(*) FROM users WHERE Username = ?");
+            $stmt->bind_param("s", $username);
+            $stmt->execute();
+            $stmt->bind_result($usernameCount);
+            $stmt->fetch();
+            $stmt->close();
+    
+            if ($usernameCount > 0) {
+                return "Username is already taken.";
+            }
+    
             $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $this->conn->prepare("INSERT INTO users (Username, Password, Email, Role, Token) VALUES (?, ?, ?, ?, ?)");
             $stmt->bind_param("sssss", $username, $hashedPassword, $email, $role, $token);
             $result = $stmt->execute();
             $stmt->close();
+    
             if (!$result) {
-                // handle error
-                return false;
+                return $this->conn->error;
             }
             return true;
         } catch (Exception $e) {
-            // handle exception
-            return false;
+            return $e->getMessage();
         }
-    }
+    }       
 
     // public function rememberUser($username) {
     //     try {

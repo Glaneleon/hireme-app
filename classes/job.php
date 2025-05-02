@@ -1,6 +1,4 @@
 <?php
-use PHPMailer\PHPMailer\PHPMailer;
-
 if (!isset($_SESSION)) {
     session_start();
 }
@@ -503,40 +501,40 @@ class Job
         return $jobs ? $jobs : null;
     }
 
-    public function newJobNotif($email, $jobName, $jobDescription)
-    {
-        if (empty($email) || empty($jobName)) {
-            return false;
-        }
+    // public function newJobNotif($email, $jobName, $jobDescription)
+    // {
+    //     if (empty($email) || empty($jobName)) {
+    //         return false;
+    //     }
 
-        $hireme_mail = "hiremeapp722@gmail.com";
-        $hireme_pass = "rrqbzkjdcmfyudpy";
+    //     $hireme_mail = "hiremeapp722@gmail.com";
+    //     $hireme_pass = "rrqbzkjdcmfyudpy";
 
-        $mail = new PHPMailer(true);
-        $mail->isSMTP();
-        $mail->SMTPAuth = true;
-        $mail->Host = "smtp.gmail.com";
-        $mail->Username = $hireme_mail;
-        $mail->Password = $hireme_pass;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-        $mail->Port = 587;
+    //     $mail = new PHPMailer(true);
+    //     $mail->isSMTP();
+    //     $mail->SMTPAuth = true;
+    //     $mail->Host = "smtp.gmail.com";
+    //     $mail->Username = $hireme_mail;
+    //     $mail->Password = $hireme_pass;
+    //     $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+    //     $mail->Port = 587;
 
-        $mail->setFrom($hireme_mail, "Hire Me");
-        $mail->addAddress($email);
-        $mail->addReplyTo($hireme_mail, "Admin-hireme");
-        $mail->IsHTML(true);
-        $mail->Subject = "A new Job (" . ucfirst($jobName) . ") has been posted!";
-        if (!empty($jobDescription)) {
-            $mail->Body = "$jobDescription";
-        } else {
-            $mail->Body = "No Job Description Included.";
-        }
-        $mail->AltBody = "Code not retrieved";
+    //     $mail->setFrom($hireme_mail, "Hire Me");
+    //     $mail->addAddress($email);
+    //     $mail->addReplyTo($hireme_mail, "Admin-hireme");
+    //     $mail->IsHTML(true);
+    //     $mail->Subject = "A new Job (" . ucfirst($jobName) . ") has been posted!";
+    //     if (!empty($jobDescription)) {
+    //         $mail->Body = "$jobDescription";
+    //     } else {
+    //         $mail->Body = "No Job Description Included.";
+    //     }
+    //     $mail->AltBody = "Code not retrieved";
 
-        if (!$mail->send()) {
-            return false;
-        } else {
-            return true;
-        }
-    }
+    //     if (!$mail->send()) {
+    //         return false;
+    //     } else {
+    //         return true;
+    //     }
+    // }
 }

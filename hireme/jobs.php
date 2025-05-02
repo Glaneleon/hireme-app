@@ -299,16 +299,46 @@ function apply_job($user_id, $resume, $job_id) {
 }
 */
 
-function apply_job_with_file($user_id, $resume, $job_id) {
+function apply_job_both($user_id, $resume, $resume_path, $job_id) {
     $conn = new ConnectDb();
-    if (!$conn->get_db()) {
+    $db = $conn->get_db();
+    if (!$db) {
         return json_encode(['verdict' => false, 'message' => 'No DB Connection!'], JSON_PRETTY_PRINT);
     }
 
-    // Insert the file into the database
-    $sql = "INSERT INTO `jobseekerapplication` (`JobID`, `UserID`, `ResumeFile`, `ApplicationDate`, `Status`) 
-            VALUES ('$job_id', '$user_id', '$resume', current_timestamp(), 'Pending')";
-    if (mysqli_query($conn->get_db(), $sql)) {
+    if (!is_uploaded_file($resume['tmp_name'])) {
+        return json_encode(['verdict' => false, 'message' => 'Invalid file uploaded!'], JSON_PRETTY_PRINT);
+    }
+
+    $fileData = file_get_contents($resume['tmp_name']);
+    $stmt = $db->prepare("INSERT INTO `jobseekerapplication` (`JobID`, `UserID`, `resumefile`, `ResumeFilePath`, `ApplicationDate`, `Status`) 
+                          VALUES (?, ?, ?, ?, current_timestamp(), 'Pending')");
+    $stmt->bind_param("isss", $job_id, $user_id, $fileData, $resume_path);
+    
+    if ($stmt->execute()) {
+        return json_encode(['verdict' => true, 'message' => 'Application submitted via file and link!'], JSON_PRETTY_PRINT);
+    } else {
+        return json_encode(['verdict' => false, 'message' => 'Application failed!'], JSON_PRETTY_PRINT);
+    }
+}
+
+function apply_job_with_file($user_id, $resume, $job_id) {
+    $conn = new ConnectDb();
+    $db = $conn->get_db();
+    if (!$db) {
+        return json_encode(['verdict' => false, 'message' => 'No DB Connection!'], JSON_PRETTY_PRINT);
+    }
+
+    if (!is_uploaded_file($resume['tmp_name'])) {
+        return json_encode(['verdict' => false, 'message' => 'Invalid file uploaded!'], JSON_PRETTY_PRINT);
+    }
+
+    $fileData = file_get_contents($resume['tmp_name']);
+    $stmt = $db->prepare("INSERT INTO `jobseekerapplication` (`JobID`, `UserID`, `resumefile`, `ApplicationDate`, `Status`) 
+                          VALUES (?, ?, ?, current_timestamp(), 'Pending')");
+    $stmt->bind_param("iis", $job_id, $user_id, $fileData);
+
+    if ($stmt->execute()) {
         return json_encode(['verdict' => true, 'message' => 'Application submitted via file!'], JSON_PRETTY_PRINT);
     } else {
         return json_encode(['verdict' => false, 'message' => 'Application failed!'], JSON_PRETTY_PRINT);

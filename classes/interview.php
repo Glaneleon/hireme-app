@@ -13,21 +13,28 @@ class Interview {
     }
 
     public function addInterview($interviewDetails) {
-        
-        $jobID = $interviewDetails->getJobID();
-        $jobSeekerApplicationID = $interviewDetails->getJobSeekerApplicationID();
-        $interviewDate = $interviewDetails->getInterviewDate();
-        $dateMade = $interviewDetails->getDateMade();
-
-        $sql = "INSERT INTO interviews (JobID, JobSeekerApplicationID, InterviewDate, DateMade) VALUES (?, ?, ?, ?)";
-        $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("iiss", $jobID, $jobSeekerApplicationID, $interviewDate, $dateMade);
-
-        if ($stmt->execute()) {
-            return true;
-        } else {
-            return false;
-        }
+      $jobID = $interviewDetails->getJobID();
+      $jobSeekerApplicationID = $interviewDetails->getJobSeekerApplicationID();
+      $interviewDate = $interviewDetails->getInterviewDate();
+      $dateMade = $interviewDetails->getDateMade();
+      
+      $sql = "INSERT INTO interviews (JobID, JobSeekerApplicationID, InterviewDate, DateMade) VALUES (?, ?, ?, ?)";
+      $stmt = $this->conn->prepare($sql);
+      $stmt->bind_param("iiss", $jobID, $jobSeekerApplicationID, $interviewDate, $dateMade);
+      
+      if ($stmt->execute()) {
+          // ADD NOTIFICATION
+          // $notificationSql = "INSERT INTO job_update_notifications (JobID, JobSeekerApplicationID, Type, DateMade) VALUES (?, ?, ?, ?)";
+          // $notificationStmt = $this->conn->prepare($notificationSql);
+          // $type = 'InterviewScheduled';
+          // $notificationStmt->bind_param("iiss", $jobID, $jobSeekerApplicationID, $type, $dateMade);
+          // $notificationStmt->execute();
+          // $notificationStmt->close();
+      
+          return true;
+      } else {
+          return false;
+      }
     }
 
     // public function getAllInterviews() {

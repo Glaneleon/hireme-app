@@ -12,28 +12,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = $_POST['username'];
     $password = $_POST['password'];
     $email = $_POST['email'];
-    $role = isset($_POST['role']) ? $_POST['role'] : false;
+    $role = $_POST['role'];
     $token = null;
 
-    if($_POST['role'] == 'Manager'){
-        $token = hash('md5', 'Manager');
-        $role = 'User';
-    }
-
     $user = new User($conn);
-if($role !== false){
-    if($user->addUser($username, $password, $email, $role, $token)) {
-        $response = array('status' => 'success', 'message' => 'Successfully registered. You will be redirected to the login page shortly.', 'redirect' => './login.php');
-    } 
-    else {
-        $response = array('status' => 'error', 'message' => 'Username or Email is already taken. Please try again.', 'redirect' => './register.php');
-    }
-}
-else{
-    $response = array('status' => 'error', 'message' => 'W-wait.. you made it here without selecting a role??.', 'redirect' => './register.php');
-}
+    $register = $user->addUser($username, $password, $email, $role, $token);
 
+    if($role){
+        if ($register === true) {
+            $response = array('status' => 'success', 'message' => 'Successfully registered. You will be redirected to the login page shortly.', 'redirect' => './login.php');
+        } elseif ($register !== true) {
+            $response = array('status' => 'error', 'message' => $register, 'redirect' => './register.php');
+        } else {
+            $response = array('status' => 'error', 'message' => 'There was an error. Please try again.', 'redirect' => './register.php');
+        }        
+    } else {
+        $response = array('status' => 'error', 'message' => 'Role is required.', 'redirect' => './register.php');
+    }    
+
+    http_response_code(200);
     echo json_encode($response);
     exit();
 }
+    
+    else {
+        http_response_code(400);
+        echo json_encode(array('status' => 'error', 'message' => 'Invalid request.'));
+        exit();
+    }
 ?>

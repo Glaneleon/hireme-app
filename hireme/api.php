@@ -99,27 +99,44 @@ if (isset($_POST['api_key'])) {
                         }
                         break; */
                         
-                 case "state_apply_job":
-                    $user_id = $_POST['user_id'] ?? '';
-                    $resume = $_POST['resumefile'] ?? ''; // File picker uploads
-                    $resume_path = $_POST['ResumeFilePath'] ?? ''; // Google Drive links
-                    $job_id = $_POST['job_id'] ?? '';
+                case "state_apply_job":
+                    $user_id = $_POST['user_id'];
+                    $resume = $_FILES['resumefile'] ?? null; // file picker
+                    $resume_path = $_POST['ResumeFilePath'] ?? null; // google drive link
+                    $job_id = $_POST['job_id'];
                 
-                    // Validate inputs
-                    if (empty($user_id) || (empty($resume) && empty($resume_path)) || empty($job_id)) {
-                        echo json_encode(['verdict' => false, 'message' => 'Missing required parameters!'], JSON_PRETTY_PRINT);
+                    // Validate essential inputs
+                    if (empty($user_id) || empty($job_id)) {
+                        echo json_encode(['verdict' => false, 'message' => 'Missing user_id or job_id!'], JSON_PRETTY_PRINT);
                         break;
                     }
                 
-                    // Handle file picker uploads
+                    if (empty($resume) && empty($resume_path)) {
+                        echo json_encode(['verdict' => false, 'message' => 'At least one of file upload or a link must be provided!'], JSON_PRETTY_PRINT);
+                        break;
+                    }
+
+                    if (!empty($resume) && !is_uploaded_file($resume['tmp_name'])) {
+                        echo json_encode(['verdict' => false, 'message' => 'Attachment is not a file.'], JSON_PRETTY_PRINT);
+                        break;
+                    }
+                
+                    $results = [];
+                
                     if (!empty($resume)) {
-                        echo $jobDb->apply_job_with_file($user_id, $resume, $job_id);
+                        $results[] = $jobDb->apply_job_with_file($user_id, $resume, $job_id);
                     }
-                    // Handle Google Drive link uploads
-                    elseif (!empty($resume_path)) {
-                        echo $jobDb->apply_job_with_link($user_id, $resume_path, $job_id);
+                
+                    if (!empty($resume_path)) {
+                        $results[] = $jobDb->apply_job_with_link($user_id, $resume_path, $job_id);
                     }
-                    break;
+
+                    if (!empty($resume_path) && !empty($resume)) {
+                        $results[] = $jobDb->apply_job_both($user_id, $resume, $resume_path, $job_id);
+                    }
+                
+                    echo json_encode(['verdict' => true, 'messages' => $results], JSON_PRETTY_PRINT);
+                    break;                        
     
                 case "state_verify_user":
                     echo $authDb->user_verification(
